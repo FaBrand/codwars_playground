@@ -123,28 +123,28 @@ class BinaryInstruction : public Instruction
 class Mov : public BinaryInstruction
 {
   public:
-    Mov(std::vector<std::string> const& tokens) : BinaryInstruction(tokens) {}
+    using BinaryInstruction::BinaryInstruction;
     void operate_on(Machine& machine) override;
 };
 
 class Inc : public UnaryInstruction
 {
   public:
-    Inc(std::vector<std::string> const& tokens) : UnaryInstruction(tokens) {}
+    using UnaryInstruction::UnaryInstruction;
     void operate_on(Machine& machine) override;
 };
 
 class Dec : public UnaryInstruction
 {
   public:
-    Dec(std::vector<std::string> const& tokens) : UnaryInstruction(tokens) {}
+    using UnaryInstruction::UnaryInstruction;
     void operate_on(Machine& machine) override;
 };
 
 class Jnz : public BinaryInstruction
 {
   public:
-    Jnz(std::vector<std::string> const& tokens) : BinaryInstruction(tokens) {}
+    using BinaryInstruction::BinaryInstruction;
     void operate_on(Machine& machine) override;
 
   private:
