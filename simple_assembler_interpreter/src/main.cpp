@@ -1,7 +1,5 @@
 #include <algorithm>
 #include <cctype>
-#include <iomanip>
-#include <iostream>
 #include <iterator>
 #include <memory>
 #include <sstream>
@@ -70,7 +68,6 @@ class Instruction
 {
   public:
     ~Instruction() = default;
-    virtual std::string get_name() const = 0;
     virtual void operate_on(Machine& machine) = 0;
 
   private:
@@ -81,10 +78,7 @@ class Mov : public Instruction
 {
   public:
     Mov(std::string param_1, std::string param_2) : register_(param_1), value_(param_2) {}
-    std::string get_name() const override
-    {
-        return std::string("MOV ") + register_ + value_;
-    }
+
     void operate_on(Machine& machine) override;
 
   private:
@@ -97,10 +91,6 @@ class Inc : public Instruction
   public:
     Inc(std::string _register) : register_{_register} {}
 
-    std::string get_name() const override
-    {
-        return std::string("INC ") + register_;
-    }
     void operate_on(Machine& machine) override;
 
   private:
@@ -113,10 +103,6 @@ class Dec : public Instruction
     Dec(std::string _register) : register_{_register} {}
 
     void operate_on(Machine& machine) override;
-    std::string get_name() const override
-    {
-        return std::string("DEC ") + register_;
-    }
 
   private:
     std::string register_{};
@@ -128,10 +114,6 @@ class Jnz : public Instruction
     Jnz(std::string param_1, std::string param_2) : register_(param_1), value_(param_2) {}
 
     void operate_on(Machine& machine) override;
-    std::string get_name() const override
-    {
-        return std::string("JNZ ") + register_ + value_;
-    }
 
   private:
     int calculate_jump_distance(Registers const& registers);
@@ -188,13 +170,22 @@ Instruction_ptr InstructionFactory::create_instruction(std::string const& name,
 Instruction& Machine::get_current_instruction() const
 {
     auto& is{*(ip_->get())};
-    std::cout << is.get_name() << std::endl;
     return is;
 }
 
 void Machine::advance_ip(std::ptrdiff_t diff)
 {
-    std::advance(ip_, --diff);
+    const auto new_position{next(ip_, diff - 1)};
+    bool is_after_begin{new_position >= program_.begin()};
+    bool is_before_end{new_position <= program_.end()};
+    if (is_after_begin && is_before_end)
+    {
+        std::advance(ip_, --diff);
+    }
+    else
+    {
+        std::advance(ip_, 1);
+    }
 }
 
 void Machine::load_program(RawProgram const& prog)
@@ -236,27 +227,13 @@ Registers& Machine::get_registers()
 
 static int& getReg(Registers& regs, std::string name)
 {
-    std::cout << "called getReg";
     return regs.at(name);
 }
 
 Registers assembler(RawProgram const& program)
 {
-    std::cout << "program{ ";
-    for (auto x : program)
-        std::cout << std::quoted(x) << ", ";
-    std::cout << "}\n";
-
     Machine machine{};
-    try
-    {
-        machine.load_program(program);
-        machine.run_program();
-    }
-    catch (std::exception& e)
-    {
-        std::cout << e.what();
-        throw e;
-    }
+    machine.load_program(program);
+    machine.run_program();
     return machine.get_registers();
 }
