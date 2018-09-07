@@ -1,10 +1,12 @@
 #include <algorithm>
 #include <cctype>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 using RawProgram = std::vector<std::string>;
 using Registers = std::unordered_map<std::string, int>;
@@ -27,7 +29,7 @@ class ValueResolver
     {
         if (is_register(in))
         {
-            return registers_.at(in);
+            return registers_->at(in);
         }
         else
         {
@@ -43,11 +45,21 @@ class ValueResolver
 class InstructionFactory
 {
   public:
-    InstructionFactory();
+    InstructionFactory(Registers&);
     Instruction_ptr create_instruction(std::string const& name, std::vector<std::string> const& arguments);
 
   private:
+    template <typename T>
+    std::unique_ptr<T> make_instruction(std::vector<std::string> const& tokens)
+    {
+        auto new_instruction{std::make_unique<T>(tokens)};
+        new_instruction->set_resolver(&value_resolver_);
+        return std::move(new_instruction);
+    }
+
     std::unordered_map<std::string, std::function<Instruction_ptr(std::vector<std::string>)>> instruction_map_{};
+    Registers& registers_;
+    ValueResolver value_resolver_{&registers_};
 };
 
 class Machine
@@ -55,8 +67,9 @@ class Machine
   public:
     void load_program(RawProgram const& prog);
     void run_program();
+    int const& get_register(std::string const&) const;
+    int& get_register(std::string const&);
     Registers const& get_registers() const;
-    Registers& get_registers();
     void advance_ip(std::ptrdiff_t diff);
 
   private:
@@ -65,7 +78,7 @@ class Machine
     Registers registers_{};
     ProgramPtr ip_{program_.begin()};
     Program program_{};
-    InstructionFactory instruction_factory_{};
+    InstructionFactory instruction_factory_{registers_};
 };
 
 class Instruction
@@ -80,13 +93,13 @@ class Instruction
 
   protected:
     std::string name_{};
-    ValueResolver const* value_resolver_{nullptr};
+    ValueResolver* value_resolver_{nullptr};
 };
 
 class UnaryInstruction : public Instruction
 {
   public:
-    UnaryInstruction(std::string param_1) : Instruction(), register_{param_1} {}
+    UnaryInstruction(std::vector<std::string> const& tokens) : Instruction(), register_{tokens.at(0)} {}
     ~UnaryInstruction() = default;
 
   protected:
@@ -96,7 +109,10 @@ class UnaryInstruction : public Instruction
 class BinaryInstruction : public Instruction
 {
   public:
-    BinaryInstruction(std::string param_1, std::string param_2) : Instruction(), register_{param_1}, value_{param_2} {}
+    BinaryInstruction(std::vector<std::string> const& tokens)
+        : Instruction(), register_{tokens.at(0)}, value_{tokens.at(1)}
+    {
+    }
     ~BinaryInstruction() = default;
 
   protected:
@@ -107,72 +123,70 @@ class BinaryInstruction : public Instruction
 class Mov : public BinaryInstruction
 {
   public:
-    Mov(std::string param_1, std::string param_2) : BinaryInstruction(param_1, param_2) {}
+    Mov(std::vector<std::string> const& tokens) : BinaryInstruction(tokens) {}
     void operate_on(Machine& machine) override;
 };
 
 class Inc : public UnaryInstruction
 {
   public:
-    Inc(std::string _register) : UnaryInstruction(_register) {}
+    Inc(std::vector<std::string> const& tokens) : UnaryInstruction(tokens) {}
     void operate_on(Machine& machine) override;
 };
 
-class Dec : public Instruction
+class Dec : public UnaryInstruction
 {
   public:
-    Dec(std::string _register) : UnaryInstruction(_register) {}
+    Dec(std::vector<std::string> const& tokens) : UnaryInstruction(tokens) {}
     void operate_on(Machine& machine) override;
 };
 
 class Jnz : public BinaryInstruction
 {
   public:
-    Jnz(std::string param_1, std::string param_2) : BinaryInstruction(param_1, param_2) {}
+    Jnz(std::vector<std::string> const& tokens) : BinaryInstruction(tokens) {}
     void operate_on(Machine& machine) override;
 
   private:
-    int calculate_jump_distance(Registers const& registers);
+    int calculate_jump_distance();
 };
 
 void Mov::operate_on(Machine& machine)
 {
-    machine.get_registers()[register_] = ValueResolver::get_value_of(machine.get_registers(), value_);
+    machine.get_register(register_) = value_resolver_->get_value_of(value_);
 }
 
 void Inc::operate_on(Machine& machine)
 {
-    ++(machine.get_registers().at(register_));
+    ++(machine.get_register(register_));
 }
 
 void Dec::operate_on(Machine& machine)
 {
-    --(machine.get_registers().at(register_));
+    --(machine.get_register(register_));
 }
 
-int Jnz::calculate_jump_distance(Registers const& registers)
+int Jnz::calculate_jump_distance()
 {
     return value_resolver_->get_value_of(value_);
 }
 
 void Jnz::operate_on(Machine& machine)
 {
-    const int jump_condition{ValueResolver::get_value_of(register_)};
+    const int jump_condition{value_resolver_->get_value_of(register_)};
     if (jump_condition != 0)
     {
-        const std::ptrdiff_t jump_distance{calculate_jump_distance(machine.get_registers())};
+        const std::ptrdiff_t jump_distance{calculate_jump_distance()};
         machine.advance_ip(jump_distance);
     }
 }
 
-InstructionFactory::InstructionFactory()
+InstructionFactory::InstructionFactory(Registers& registers) : registers_{registers}
 {
-    instruction_map_.emplace("mov",
-                             [](auto const& tokens) { return std::make_unique<Mov>(tokens.at(0), tokens.at(1)); });
-    instruction_map_.emplace("jnz",
-                             [](auto const& tokens) { return std::make_unique<Jnz>(tokens.at(0), tokens.at(1)); });
-    instruction_map_.emplace("inc", [](auto const& tokens) { return std::make_unique<Inc>(tokens.at(0)); });
-    instruction_map_.emplace("dec", [](auto const& tokens) { return std::make_unique<Dec>(tokens.at(0)); });
+    instruction_map_.emplace("mov", [this](auto const& tokens) { return make_instruction<Mov>(tokens); });
+    instruction_map_.emplace("jnz", [this](auto const& tokens) { return make_instruction<Jnz>(tokens); });
+    instruction_map_.emplace("inc", [this](auto const& tokens) { return make_instruction<Inc>(tokens); });
+    instruction_map_.emplace("dec", [this](auto const& tokens) { return make_instruction<Dec>(tokens); });
 }
 
 Instruction_ptr InstructionFactory::create_instruction(std::string const& name,
@@ -190,9 +204,10 @@ Instruction& Machine::get_current_instruction() const
 void Machine::advance_ip(std::ptrdiff_t diff)
 {
     const auto new_position{next(ip_, diff - 1)};
-    bool is_after_begin{new_position >= program_.begin()};
-    bool is_before_end{new_position <= program_.end()};
-    if (is_after_begin && is_before_end)
+    const bool is_after_begin{new_position >= program_.begin()};
+    const bool is_before_end{new_position <= program_.end()};
+    const bool is_new_position_in_range{is_after_begin && is_before_end};
+    if (is_new_position_in_range)
     {
         std::advance(ip_, --diff);
     }
@@ -228,21 +243,25 @@ std::vector<std::string> Machine::split_tokens(std::string const& command)
     return std::vector<std::string>((std::istream_iterator<std::string>(splitter)),
                                     std::istream_iterator<std::string>());
 }
+int const& Machine::get_register(std::string const& register_name) const
+{
+    return registers_.at(register_name);
+}
+
+int& Machine::get_register(std::string const& register_name)
+{
+    return registers_[register_name];
+}
 
 Registers const& Machine::get_registers() const
 {
     return registers_;
 }
 
-Registers& Machine::get_registers()
-{
-    return registers_;
-}
-
-static int& getReg(Registers& regs, std::string name)
-{
-    return regs.at(name);
-}
+// static int& getReg(Registers& regs, std::string name)
+// {
+//     return regs.at(name);
+// }
 
 Registers assembler(RawProgram const& program)
 {
