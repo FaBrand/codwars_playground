@@ -1,9 +1,9 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "assembler_interpreter/src/assembler_main.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "simple_assembler_interpreter/src/assembler_main.h"
 
 using ::testing::ContainerEq;
 

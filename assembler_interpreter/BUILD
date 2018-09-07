@@ -1,6 +1,6 @@
 
 cc_library(
-    name = "simple_assembler",
+    name = "assembler",
     srcs = glob(["src/*.cpp"]),
     hdrs = ["src/assembler_main.h"],
     visibility = ["//visibility:public"],
@@ -12,7 +12,7 @@ cc_test (
     name = "tests",
     srcs = glob(["test/*.cpp"]),
     deps = [
-        "simple_assembler",
+        "assembler",
         "@googletest//:gtest_main"
     ],
 )
