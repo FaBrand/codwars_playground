@@ -4,4 +4,3 @@
 std::unordered_map<std::string, int> assembler(std::vector<std::string> const& program);
 
 #endif /* MAIN_H */
-

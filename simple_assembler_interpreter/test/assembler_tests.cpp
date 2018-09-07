@@ -56,3 +56,20 @@ TEST(SimpleAssembler_1, SimpleJnzProgram)
   EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
 }
 
+TEST(SimpleAssebler_1, Complex1Fake)
+{
+  std::vector<std::string> program{ "mov a 1", "mov b 1", "mov c 0", "mov d 26", "jnz c 2", "jnz 1 5", "mov c 7", "inc d", "dec c", "jnz c -2", "mov c a", "inc a", "dec b", "jnz b -2", "mov b c", "dec d", "jnz d -6", "mov c 18", "mov d 11", "inc a", "dec d", "jnz d -2", "dec c", "jnz c -5" };
+  assembler(program);
+}
+
+TEST(SimpleAssebler_1, Complex2Fake)
+{
+  std::vector<std::string> program{ "mov d 100", "dec d", "mov b d", "jnz b -2", "inc d", "mov a d", "jnz 5 10", "mov c a" };
+  assembler(program);
+}
+
+TEST(SimpleAssebler_1, Complex3Fake)
+{
+  std::vector<std::string> program{ "mov c 12", "mov b 0", "mov a 200", "dec a", "inc b", "jnz a -2", "dec c", "mov a b", "jnz c -5", "jnz 0 1", "mov c a" };
+  assembler(program);
+}
