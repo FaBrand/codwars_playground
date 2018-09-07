@@ -5,12 +5,12 @@ My turn on the [assembler interpreter part 1 Kata](https://www.codewars.com/kata
 This is the first part of this kata series. Second part is [here](https://www.codewars.com/kata/assembler-interpreter-part-ii/).
 
 We want to create a simple interpreter of assembler which will support the following instructions:
-    | Instruction     | Description    |
-    |---- |-----|
-    | mov x y | copies y (either a constant value or the content of a register) into register x|
-    | inc x | increases the content of register x by one|
-    | dec x | decreases the content of register x by one|
-    | jnz x y | jumps to an instruction y steps away (positive means forward, negative means backward), but only if x (a constant or a register) is not zero|
+    | Instruction | Description                                                                                                                                  |
+    | ---         | ---                                                                                                                                          |
+    | mov x y     | copies y (either a constant value or the content of a register) into register x                                                              |
+    | inc x       | increases the content of register x by one                                                                                                   |
+    | dec x       | decreases the content of register x by one                                                                                                   |
+    | jnz x y     | jumps to an instruction y steps away (positive means forward, negative means backward), but only if x (a constant or a register) is not zero |
 
 Register names are alphabetical (letters only). Constants are always integers (positive or negative).
 
