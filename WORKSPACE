@@ -1,6 +1,6 @@
-git_repository(
-    name = "gtest",
+new_git_repository(
+    name = "googletest",
+    build_file = "gmock.BUILD",
     remote = "https://github.com/google/googletest",
-    commit = "3306848f697568aacf4bcca330f6bdd5ce671899",
+    tag = "release-1.8.0",
 )
-

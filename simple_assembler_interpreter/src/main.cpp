@@ -1,3 +1,5 @@
+#include <iterator>
+#include <iomanip>
 #include <string>
 #include <unordered_map>
 #include <iostream>
@@ -191,7 +193,6 @@ static int& getReg(Registers& regs, std::string name)
   return regs.at(name);
 }
 
-#include <iomanip>
 Registers assembler(RawProgram const& program)
 {
     std::cout << "program{ ";
@@ -212,58 +213,3 @@ Registers assembler(RawProgram const& program)
 
 
 
-#include <string>
-#include <unordered_map>
-
-// TODO: Replace examples and use TDD development by writing your own tests
-Describe(SolutionTest)
-{
-  It(EmptyProgram)
-  {
-    std::vector<std::string> program{};
-    std::unordered_map<std::string, int> out{};
-    Assert::That(assembler(program), Equals(out));
-  }
-
-  It(SimpleMovValueProgram)
-  {
-    std::vector<std::string> program{ "mov a 5" };
-    std::unordered_map<std::string, int> out{ { "a", 5 } };
-    Assert::That(assembler(program), Equals(out));
-  }
-
-  It(SimpleMovRegisterProgram)
-  {
-    std::vector<std::string> program{ "mov a 5", "mov a a" };
-    std::unordered_map<std::string, int> out{ { "a", 5 } };
-    Assert::That(assembler(program), Equals(out));
-  }
-
-  It(SimpleIncProgram)
-  {
-    std::vector<std::string> program{ "mov a 5", "inc a" };
-    std::unordered_map<std::string, int> out{ { "a", 6 } };
-    Assert::That(assembler(program), Equals(out));
-  }
-
-  It(SimpleDecProgram)
-  {
-    std::vector<std::string> program{ "mov a 5", "dec a" };
-    std::unordered_map<std::string, int> out{ { "a", 4 } };
-    Assert::That(assembler(program), Equals(out));
-  }
-
-  It(ComplexMovDecIncProgram)
-  {
-    std::vector<std::string> program{ "mov a 5", "dec a", "mov b a", "inc b", "mov c 6", "dec c" };
-    std::unordered_map<std::string, int> out{ { "a", 4 },{ "b", 5 }, { "c", 5 } };
-    Assert::That(assembler(program), Equals(out));
-  }
-
-  It(SimpleJnzProgram)
-  {
-    std::vector<std::string> program{ "mov a 5", "dec a", "jnz a -1" };
-    std::unordered_map<std::string, int> out{ { "a", 0 } };
-    Assert::That(assembler(program), Equals(out));
-  }
-};
