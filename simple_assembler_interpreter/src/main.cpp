@@ -22,11 +22,12 @@ bool is_register(std::string const& val)
 class ValueResolver
 {
   public:
-    static int get_value_of(Registers const& registers, std::string const& in)
+    ValueResolver(Registers* registers) : registers_{registers} {}
+    int get_value_of(std::string const& in)
     {
         if (is_register(in))
         {
-            return registers.at(in);
+            return registers_.at(in);
         }
         else
         {
@@ -34,6 +35,9 @@ class ValueResolver
             return value_as_int;
         }
     };
+
+  private:
+    Registers* registers_{nullptr};
 };
 
 class InstructionFactory
@@ -68,57 +72,67 @@ class Instruction
 {
   public:
     ~Instruction() = default;
+    void set_resolver(ValueResolver* resolver)
+    {
+        value_resolver_ = resolver;
+    }
     virtual void operate_on(Machine& machine) = 0;
 
-  private:
+  protected:
     std::string name_{};
+    ValueResolver const* value_resolver_{nullptr};
 };
 
-class Mov : public Instruction
+class UnaryInstruction : public Instruction
 {
   public:
-    Mov(std::string param_1, std::string param_2) : register_(param_1), value_(param_2) {}
+    UnaryInstruction(std::string param_1) : Instruction(), register_{param_1} {}
+    ~UnaryInstruction() = default;
 
-    void operate_on(Machine& machine) override;
+  protected:
+    std::string register_{};
+};
 
-  private:
+class BinaryInstruction : public Instruction
+{
+  public:
+    BinaryInstruction(std::string param_1, std::string param_2) : Instruction(), register_{param_1}, value_{param_2} {}
+    ~BinaryInstruction() = default;
+
+  protected:
     std::string register_{};
     std::string value_{};
 };
 
-class Inc : public Instruction
+class Mov : public BinaryInstruction
 {
   public:
-    Inc(std::string _register) : register_{_register} {}
-
+    Mov(std::string param_1, std::string param_2) : BinaryInstruction(param_1, param_2) {}
     void operate_on(Machine& machine) override;
+};
 
-  private:
-    std::string register_{};
+class Inc : public UnaryInstruction
+{
+  public:
+    Inc(std::string _register) : UnaryInstruction(_register) {}
+    void operate_on(Machine& machine) override;
 };
 
 class Dec : public Instruction
 {
   public:
-    Dec(std::string _register) : register_{_register} {}
-
+    Dec(std::string _register) : UnaryInstruction(_register) {}
     void operate_on(Machine& machine) override;
-
-  private:
-    std::string register_{};
 };
 
-class Jnz : public Instruction
+class Jnz : public BinaryInstruction
 {
   public:
-    Jnz(std::string param_1, std::string param_2) : register_(param_1), value_(param_2) {}
-
+    Jnz(std::string param_1, std::string param_2) : BinaryInstruction(param_1, param_2) {}
     void operate_on(Machine& machine) override;
 
   private:
     int calculate_jump_distance(Registers const& registers);
-    std::string register_{};
-    std::string value_{};
 };
 
 void Mov::operate_on(Machine& machine)
@@ -138,12 +152,12 @@ void Dec::operate_on(Machine& machine)
 
 int Jnz::calculate_jump_distance(Registers const& registers)
 {
-    return ValueResolver::get_value_of(registers, value_);
+    return value_resolver_->get_value_of(value_);
 }
 
 void Jnz::operate_on(Machine& machine)
 {
-    const int jump_condition{ValueResolver::get_value_of(machine.get_registers(), register_)};
+    const int jump_condition{ValueResolver::get_value_of(register_)};
     if (jump_condition != 0)
     {
         const std::ptrdiff_t jump_distance{calculate_jump_distance(machine.get_registers())};
