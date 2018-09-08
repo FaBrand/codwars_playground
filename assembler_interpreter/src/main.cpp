@@ -90,6 +90,7 @@ class Machine
     std::string flush();
     void add_label_reference(std::string name);
     void jump_to(std::string name);
+    void enter_subroutine(std::string name);
     void _return();
     void set_comparison_status_flag(CmpStatusFlags new_status);
     void jump_if_flag_is_set(std::string label, CmpStatusFlags flag);
@@ -322,7 +323,7 @@ class Call : public UnaryInstruction
 
 void Call::operate_on(Machine& machine)
 {
-    machine.jump_to(register_);
+    machine.enter_subroutine(register_);
 }
 
 class Ret : public NullaryInstruction
@@ -335,6 +336,18 @@ class Ret : public NullaryInstruction
 void Ret::operate_on(Machine& machine)
 {
     machine._return();
+}
+
+class Jmp : public UnaryInstruction
+{
+  public:
+    using UnaryInstruction::UnaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void Jmp::operate_on(Machine& machine)
+{
+    machine.jump_to(register_);
 }
 
 class Cmp : public BinaryInstruction
@@ -506,6 +519,7 @@ InstructionFactory::InstructionFactory(Registers& registers) : registers_{regist
     instruction_map_.emplace("label", [this](auto const& tokens) { return make_instruction<Label>(tokens); });
     instruction_map_.emplace("call", [this](auto const& tokens) { return make_instruction<Call>(tokens); });
     instruction_map_.emplace("ret", [this](auto const& tokens) { return make_instruction<Ret>(tokens); });
+    instruction_map_.emplace("jmp", [this](auto const& tokens) { return make_instruction<Jmp>(tokens); });
     instruction_map_.emplace("cmp", [this](auto const& tokens) { return make_instruction<Cmp>(tokens); });
     instruction_map_.emplace("jne", [this](auto const& tokens) { return make_instruction<Jne>(tokens); });
     instruction_map_.emplace("je", [this](auto const& tokens) { return make_instruction<Je>(tokens); });
@@ -528,7 +542,16 @@ Instruction_ptr InstructionFactory::create_instruction(std::string const& name,
     }
     else
     {
-        return instruction_map_.at(name)(arguments);
+        try
+        {
+            return instruction_map_.at(name)(arguments);
+        }
+        catch (std::exception e)
+        {
+            std::cout << "Encountered exception: " << e.what() << '\n';
+            std::cout << "Unknown instruction type: " << name << std::endl;
+            throw;
+        }
     }
 }
 
@@ -609,10 +632,14 @@ void Machine::add_label_reference(std::string name)
 {
     label_map_[name] = ip_;
 }
+void Machine::enter_subroutine(std::string name)
+{
+    jump_stack_.push(ip_);
+    jump_to(name);
+}
 
 void Machine::jump_to(std::string name)
 {
-    jump_stack_.push(ip_);
     ip_ = label_map_.at(name);
 }
 
