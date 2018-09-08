@@ -124,20 +124,6 @@ TEST(SimpleAssembler_1, SimpleDivFloor)
     EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
 }
 
-TEST(SimpleAssembler_1, CommentIsIgnored)
-{
-    std::vector<std::string> program{"; A comment", "mov a 5", "div a 2"};
-    std::unordered_map<std::string, int> out{{"a", 2}};
-    EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
-}
-
-TEST(SimpleAssembler_1, IndentedCommentIsIgnored)
-{
-    std::vector<std::string> program{"  ; A comment", "mov a 5", "div a 2"};
-    std::unordered_map<std::string, int> out{{"a", 2}};
-    EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
-}
-
 TEST(SimpleAssembler_1, IndentedOperatorIsRead)
 {
     std::vector<std::string> program{"  mov a 5", "  div a 2"};
