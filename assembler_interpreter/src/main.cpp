@@ -80,20 +80,20 @@ enum CmpStatusFlags : unsigned int
 class Machine
 {
   public:
-    void load_program(RawProgram const& prog);
-    void run_program();
+    Registers const& get_registers() const;
     int const& get_register(std::string const&) const;
     int& get_register(std::string const&);
-    Registers const& get_registers() const;
+    std::string flush();
+    void _return();
+    void add_label_reference(std::string name);
     void advance_ip(std::ptrdiff_t diff);
     void end_execution();
-    std::string flush();
-    void add_label_reference(std::string name);
-    void jump_to(std::string name);
     void enter_subroutine(std::string name);
-    void _return();
-    void set_comparison_status_flag(CmpStatusFlags new_status);
     void jump_if_flag_is_set(std::string label, CmpStatusFlags flag);
+    void jump_to(std::string name);
+    void load_program(RawProgram const& prog);
+    void run_program();
+    void set_comparison_status_flag(CmpStatusFlags new_status);
 
   public:
     std::stringstream msg_port{};
@@ -101,17 +101,17 @@ class Machine
   private:
     void pre_run();
 
+    CmpStatusFlags comparison_status_register_{CmpStatusFlags::Invalid};
+    Instruction& get_current_instruction() const;
+    InstructionFactory instruction_factory_{registers_};
+    Program program_{};
+    ProgramPtr ip_{program_.begin()};
+    Registers registers_{};
+    std::stack<ProgramPtr> jump_stack_{};
     std::stringstream default_out{"-1"};
     std::stringstream* std_out{&default_out};
-    std::vector<std::string> split_tokens(std::string const& command);
-    Instruction& get_current_instruction() const;
-    CmpStatusFlags comparison_status_register_{CmpStatusFlags::Invalid};
-    Registers registers_{};
     std::unordered_map<std::string, ProgramPtr> label_map_{};
-    ProgramPtr ip_{program_.begin()};
-    Program program_{};
-    InstructionFactory instruction_factory_{registers_};
-    std::stack<ProgramPtr> jump_stack_{};
+    std::vector<std::string> split_tokens(std::string const& command);
 };
 
 class Instruction
@@ -178,6 +178,11 @@ class Mov : public BinaryInstruction
     void operate_on(Machine& machine) override;
 };
 
+void Mov::operate_on(Machine& machine)
+{
+    machine.get_register(register_) = value_resolver_->get_value_of(value_);
+}
+
 class Inc : public UnaryInstruction
 {
   public:
@@ -185,12 +190,22 @@ class Inc : public UnaryInstruction
     void operate_on(Machine& machine) override;
 };
 
+void Inc::operate_on(Machine& machine)
+{
+    ++(machine.get_register(register_));
+}
+
 class Dec : public UnaryInstruction
 {
   public:
     using UnaryInstruction::UnaryInstruction;
     void operate_on(Machine& machine) override;
 };
+
+void Dec::operate_on(Machine& machine)
+{
+    --(machine.get_register(register_));
+}
 
 class Jnz : public BinaryInstruction
 {
@@ -201,6 +216,21 @@ class Jnz : public BinaryInstruction
   private:
     int calculate_jump_distance();
 };
+
+void Jnz::operate_on(Machine& machine)
+{
+    const int jump_condition{value_resolver_->get_value_of(register_)};
+    if (jump_condition != 0)
+    {
+        const std::ptrdiff_t jump_distance{calculate_jump_distance()};
+        machine.advance_ip(jump_distance);
+    }
+}
+
+int Jnz::calculate_jump_distance()
+{
+    return value_resolver_->get_value_of(value_);
+}
 
 class Add : public BinaryInstruction
 {
@@ -474,36 +504,6 @@ class Jl : public ConditionalJumpInstruction
     }
 };
 
-void Mov::operate_on(Machine& machine)
-{
-    machine.get_register(register_) = value_resolver_->get_value_of(value_);
-}
-
-void Inc::operate_on(Machine& machine)
-{
-    ++(machine.get_register(register_));
-}
-
-void Dec::operate_on(Machine& machine)
-{
-    --(machine.get_register(register_));
-}
-
-int Jnz::calculate_jump_distance()
-{
-    return value_resolver_->get_value_of(value_);
-}
-
-void Jnz::operate_on(Machine& machine)
-{
-    const int jump_condition{value_resolver_->get_value_of(register_)};
-    if (jump_condition != 0)
-    {
-        const std::ptrdiff_t jump_distance{calculate_jump_distance()};
-        machine.advance_ip(jump_distance);
-    }
-}
-
 InstructionFactory::InstructionFactory(Registers& registers) : registers_{registers}
 {
     instruction_map_.emplace("mov", [this](auto const& tokens) { return make_instruction<Mov>(tokens); });
@@ -632,6 +632,7 @@ void Machine::add_label_reference(std::string name)
 {
     label_map_[name] = ip_;
 }
+
 void Machine::enter_subroutine(std::string name)
 {
     jump_stack_.push(ip_);
@@ -660,6 +661,7 @@ void Machine::set_comparison_status_flag(CmpStatusFlags new_status)
         comparison_status_register_ = static_cast<CmpStatusFlags>(comparison_status_register_ | new_status);
     }
 }
+
 void Machine::jump_if_flag_is_set(std::string label, CmpStatusFlags flag)
 {
     if (comparison_status_register_ & flag)
@@ -667,11 +669,6 @@ void Machine::jump_if_flag_is_set(std::string label, CmpStatusFlags flag)
         jump_to(label);
     }
 }
-
-// static int& getReg(Registers& regs, std::string name)
-// {
-//     return regs.at(name);
-// }
 
 Registers assembler(RawProgram const& program)
 {
