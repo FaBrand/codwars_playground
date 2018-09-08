@@ -559,8 +559,7 @@ print:
     EXPECT_EQ(assembler_interpreter(program), "-1");
 }
 
-// Is failing because the ret statement
-TEST(SampleTests, DISABLED_Tests7)
+TEST(SampleTests, Tests7)
 {
     std::string program = R"(
 mov   a, 2            ; value1
