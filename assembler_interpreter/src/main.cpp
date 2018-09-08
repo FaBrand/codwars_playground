@@ -729,15 +729,8 @@ void TokenSplitter::parse()
     splitup_tokens_ = get_lines(raw_token_);
 }
 
-void delete_braces_front_and_end(std::string& raw_program)
-{
-    if (raw_program.size() > 2)
-        raw_program = raw_program.substr(1, raw_program.size() - 1);
-}
-
 std::vector<std::string> sanitize_raw_program(std::string& raw_program)
 {
-    delete_braces_front_and_end(raw_program);
     std::vector<std::string> program{get_lines(raw_program)};
     std::transform(program.begin(), program.end(), program.begin(), [](auto instruction) {
         std::regex delimiter(";.*(?=(?:[^']*'[^']*')*[^']*$)");

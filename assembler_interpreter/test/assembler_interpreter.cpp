@@ -24,24 +24,6 @@ inc  a
     EXPECT_EQ(assembler_interpreter(program), "-1");
 }
 
-TEST(AssemblerInterpreter, BasicProgramSyntaxVariedEndParen)
-{
-    std::string program{R"(
-; My first program
-mov  a, 5
-inc  a)"};
-    EXPECT_EQ(assembler_interpreter(program), "-1");
-}
-
-TEST(AssemblerInterpreter, BasicProgramSyntaxVariedFrontParen)
-{
-    std::string program{R"( ; My first program
-mov  a, 5
-inc  a
-)"};
-    EXPECT_EQ(assembler_interpreter(program), "-1");
-}
-
 TEST(AssemblerInterpreter, MsgInstruction)
 {
     std::string program{R"( ; My first program
