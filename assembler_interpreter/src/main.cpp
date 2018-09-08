@@ -78,9 +78,11 @@ class Machine
     std::string flush();
 
   public:
-    std::stringstream std_out{};
+    std::stringstream msg_port{};
 
   private:
+    std::stringstream default_out{"-1"};
+    std::stringstream* std_out{&default_out};
     std::vector<std::string> split_tokens(std::string const& command);
     Instruction& get_current_instruction() const;
     Registers registers_{};
@@ -138,13 +140,7 @@ class BinaryInstruction : public Instruction
 class NaryInstruction : public Instruction
 {
   public:
-    NaryInstruction(std::vector<std::string> const& tokens) : Instruction(), arguments_{tokens}
-    {
-        for (auto i : arguments_)
-        {
-            std::cout << std::quoted(i) << '\n';
-        }
-    }
+    NaryInstruction(std::vector<std::string> const& tokens) : Instruction(), arguments_{tokens} {}
     ~NaryInstruction() = default;
 
   protected:
@@ -259,7 +255,6 @@ bool Msg::is_arg_text(std::string const& arg)
 std::string Msg::strippedQuotes(std::string arg)
 {
     arg.erase(std::remove(arg.begin(), arg.end(), '\''), arg.end());
-    std::cout << std::quoted(arg) << '\n';
     return arg;
 }
 
@@ -267,7 +262,7 @@ void Msg::operate_on(Machine& machine)
 {
     std::transform(arguments_.begin(),
                    arguments_.end(),
-                   std::ostream_iterator<std::string>(machine.std_out, ""),
+                   std::ostream_iterator<std::string>(machine.msg_port, ""),
                    [this](auto const& arg) {
                        if (Msg::is_arg_text(arg))
                        {
@@ -353,6 +348,7 @@ void Machine::advance_ip(std::ptrdiff_t diff)
 }
 void Machine::end_execution()
 {
+    std_out = &msg_port;
     ip_ = next(program_.end(), -1);
 }
 void Machine::load_program(RawProgram const& prog)
@@ -392,7 +388,7 @@ Registers const& Machine::get_registers() const
 
 std::string Machine::flush()
 {
-    return std_out.str();
+    return std_out->str();
 }
 
 // static int& getReg(Registers& regs, std::string name)
@@ -458,13 +454,12 @@ void TokenSplitter::parse()
 
 void delete_braces_front_and_end(std::string& raw_program)
 {
-    raw_program = raw_program.substr(1, raw_program.size() - 1);
+    if (raw_program.size() > 2)
+        raw_program = raw_program.substr(1, raw_program.size() - 1);
 }
 
-std::string assembler_interpreter(std::string raw_program)
+std::vector<std::string> sanitize_raw_program(std::string& raw_program)
 {
-    if (raw_program.size() == 0)
-        return "";
     delete_braces_front_and_end(raw_program);
     std::vector<std::string> program{get_lines(raw_program)};
     std::transform(program.begin(), program.end(), program.begin(), [](auto instruction) {
@@ -479,7 +474,12 @@ std::string assembler_interpreter(std::string raw_program)
                            return is_only_whitespace;
                        }),
         program.end());
+    return program;
+}
 
+std::string assembler_interpreter(std::string raw_program)
+{
+    auto program{sanitize_raw_program(raw_program)};
     Machine machine{};
     machine.load_program(program);
     machine.run_program();

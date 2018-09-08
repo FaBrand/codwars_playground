@@ -10,7 +10,7 @@ using ::testing::ContainerEq;
 TEST(AssemblerInterpreter, EmptyProgram)
 {
     std::string program{};
-    EXPECT_EQ(assembler_interpreter(program), "");
+    EXPECT_EQ(assembler_interpreter(program), "-1");
 }
 
 TEST(AssemblerInterpreter, BasicProgramSyntax)
@@ -21,7 +21,7 @@ mov  a, 5
 inc  a
 )"};
 
-    EXPECT_EQ(assembler_interpreter(program), "");
+    EXPECT_EQ(assembler_interpreter(program), "-1");
 }
 
 TEST(AssemblerInterpreter, BasicProgramSyntaxVariedEndParen)
@@ -30,7 +30,7 @@ TEST(AssemblerInterpreter, BasicProgramSyntaxVariedEndParen)
 ; My first program
 mov  a, 5
 inc  a)"};
-    EXPECT_EQ(assembler_interpreter(program), "");
+    EXPECT_EQ(assembler_interpreter(program), "-1");
 }
 
 TEST(AssemblerInterpreter, BasicProgramSyntaxVariedFrontParen)
@@ -39,7 +39,7 @@ TEST(AssemblerInterpreter, BasicProgramSyntaxVariedFrontParen)
 mov  a, 5
 inc  a
 )"};
-    EXPECT_EQ(assembler_interpreter(program), "");
+    EXPECT_EQ(assembler_interpreter(program), "-1");
 }
 
 TEST(AssemblerInterpreter, MsgInstruction)
@@ -47,6 +47,7 @@ TEST(AssemblerInterpreter, MsgInstruction)
     std::string program{R"( ; My first program
 mov  a, 5
 msg 'Reg: ', a
+end
 )"};
     EXPECT_EQ(assembler_interpreter(program), "Reg: 5");
 }
@@ -56,6 +57,16 @@ TEST(AssemblerInterpreter, MsgInstructionTrailingComment)
     std::string program{R"( ; My first program
 mov  a, 5
 msg 'Reg: ', a ; This  is a trailing comment
+end
 )"};
     EXPECT_EQ(assembler_interpreter(program), "Reg: 5");
+}
+
+TEST(AssemblerInterpreter, MsgOnlyWrittenIfEndIsExecuted)
+{
+    std::string program{R"( ; My first program
+mov  a, 5
+msg 'Reg: ', a
+)"};
+    EXPECT_EQ(assembler_interpreter(program), "-1");
 }
