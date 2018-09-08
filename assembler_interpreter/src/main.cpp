@@ -66,6 +66,17 @@ class InstructionFactory
     ValueResolver value_resolver_{&registers_};
 };
 
+enum CmpStatusFlags : unsigned int
+{
+    Invalid = 0,
+    Equal = 0b000001,
+    NotEqual = 0b000010,
+    GreaterOrEqual = 0b000100,
+    Greater = 0b001000,
+    LessOrEqual = 0b010000,
+    Less = 0b100000
+};
+
 class Machine
 {
   public:
@@ -80,6 +91,8 @@ class Machine
     void add_label_reference(std::string name);
     void jump_to(std::string name);
     void _return();
+    void set_comparison_status_flag(CmpStatusFlags new_status);
+    void jump_if_flag_is_set(std::string label, CmpStatusFlags flag);
 
   public:
     std::stringstream msg_port{};
@@ -91,6 +104,7 @@ class Machine
     std::stringstream* std_out{&default_out};
     std::vector<std::string> split_tokens(std::string const& command);
     Instruction& get_current_instruction() const;
+    CmpStatusFlags comparison_status_register_{CmpStatusFlags::Invalid};
     Registers registers_{};
     std::unordered_map<std::string, ProgramPtr> label_map_{};
     ProgramPtr ip_{program_.begin()};
@@ -323,6 +337,130 @@ void Ret::operate_on(Machine& machine)
     machine._return();
 }
 
+class Cmp : public BinaryInstruction
+{
+  public:
+    using BinaryInstruction::BinaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void Cmp::operate_on(Machine& machine)
+{
+    auto const lhs{value_resolver_->get_value_of(register_)};
+    auto const rhs{value_resolver_->get_value_of(value_)};
+
+    machine.set_comparison_status_flag(CmpStatusFlags::Invalid);
+    if (lhs == rhs)
+    {
+        machine.set_comparison_status_flag(CmpStatusFlags::Equal);
+        machine.set_comparison_status_flag(CmpStatusFlags::LessOrEqual);
+        machine.set_comparison_status_flag(CmpStatusFlags::GreaterOrEqual);
+    }
+    else
+    {
+        machine.set_comparison_status_flag(CmpStatusFlags::NotEqual);
+    }
+
+    if (lhs < rhs)
+    {
+        machine.set_comparison_status_flag(CmpStatusFlags::Less);
+        machine.set_comparison_status_flag(CmpStatusFlags::LessOrEqual);
+    }
+
+    if (lhs > rhs)
+    {
+        machine.set_comparison_status_flag(CmpStatusFlags::Greater);
+        machine.set_comparison_status_flag(CmpStatusFlags::GreaterOrEqual);
+    }
+}
+
+class ConditionalJumpInstruction : public UnaryInstruction
+{
+  public:
+    using UnaryInstruction::UnaryInstruction;
+    void operate_on(Machine& machine) override;
+
+  protected:
+    virtual CmpStatusFlags get_instruction_flag() const = 0;
+};
+
+void ConditionalJumpInstruction::operate_on(Machine& machine)
+{
+    machine.jump_if_flag_is_set(register_, get_instruction_flag());
+}
+
+class Jne : public ConditionalJumpInstruction
+{
+  public:
+    using ConditionalJumpInstruction::ConditionalJumpInstruction;
+
+  protected:
+    CmpStatusFlags get_instruction_flag() const override
+    {
+        return CmpStatusFlags::NotEqual;
+    }
+};
+
+class Je : public ConditionalJumpInstruction
+{
+  public:
+    using ConditionalJumpInstruction::ConditionalJumpInstruction;
+
+  protected:
+    CmpStatusFlags get_instruction_flag() const override
+    {
+        return CmpStatusFlags::Equal;
+    }
+};
+
+class Jge : public ConditionalJumpInstruction
+{
+  public:
+    using ConditionalJumpInstruction::ConditionalJumpInstruction;
+
+  protected:
+    CmpStatusFlags get_instruction_flag() const override
+    {
+        return CmpStatusFlags::GreaterOrEqual;
+    }
+};
+
+class Jg : public ConditionalJumpInstruction
+{
+  public:
+    using ConditionalJumpInstruction::ConditionalJumpInstruction;
+
+  protected:
+    CmpStatusFlags get_instruction_flag() const override
+    {
+        return CmpStatusFlags::Greater;
+    }
+};
+
+class Jle : public ConditionalJumpInstruction
+{
+  public:
+    using ConditionalJumpInstruction::ConditionalJumpInstruction;
+
+  protected:
+    CmpStatusFlags get_instruction_flag() const override
+    {
+        return CmpStatusFlags::LessOrEqual;
+    }
+};
+
+class Jl : public ConditionalJumpInstruction
+{
+  public:
+    using ConditionalJumpInstruction::ConditionalJumpInstruction;
+
+  protected:
+    CmpStatusFlags get_instruction_flag() const override
+    {
+        return CmpStatusFlags::Less;
+    }
+};
+
 void Mov::operate_on(Machine& machine)
 {
     machine.get_register(register_) = value_resolver_->get_value_of(value_);
@@ -368,6 +506,13 @@ InstructionFactory::InstructionFactory(Registers& registers) : registers_{regist
     instruction_map_.emplace("label", [this](auto const& tokens) { return make_instruction<Label>(tokens); });
     instruction_map_.emplace("call", [this](auto const& tokens) { return make_instruction<Call>(tokens); });
     instruction_map_.emplace("ret", [this](auto const& tokens) { return make_instruction<Ret>(tokens); });
+    instruction_map_.emplace("cmp", [this](auto const& tokens) { return make_instruction<Cmp>(tokens); });
+    instruction_map_.emplace("jne", [this](auto const& tokens) { return make_instruction<Jne>(tokens); });
+    instruction_map_.emplace("je", [this](auto const& tokens) { return make_instruction<Je>(tokens); });
+    instruction_map_.emplace("jge", [this](auto const& tokens) { return make_instruction<Jge>(tokens); });
+    instruction_map_.emplace("jg", [this](auto const& tokens) { return make_instruction<Jg>(tokens); });
+    instruction_map_.emplace("jle", [this](auto const& tokens) { return make_instruction<Jle>(tokens); });
+    instruction_map_.emplace("jl", [this](auto const& tokens) { return make_instruction<Jl>(tokens); });
 }
 
 Instruction_ptr InstructionFactory::create_instruction(std::string const& name,
@@ -426,7 +571,7 @@ void Machine::load_program(RawProgram const& prog)
 
 void Machine::pre_run()
 {
-    for (ip_ = program_.begin();ip_ != program_.end(); std::advance(ip_, 1))
+    for (ip_ = program_.begin(); ip_ != program_.end(); std::advance(ip_, 1))
     {
         get_current_instruction().pre_run(*this);
     }
@@ -434,7 +579,7 @@ void Machine::pre_run()
 
 void Machine::run_program()
 {
-    for (ip_ = program_.begin();ip_ != program_.end(); std::advance(ip_, 1))
+    for (ip_ = program_.begin(); ip_ != program_.end(); std::advance(ip_, 1))
     {
         get_current_instruction().operate_on(*this);
     }
@@ -462,7 +607,6 @@ std::string Machine::flush()
 
 void Machine::add_label_reference(std::string name)
 {
-    std::cout << "Adding label " << std::quoted(name) << std::endl;
     label_map_[name] = ip_;
 }
 
@@ -470,13 +614,31 @@ void Machine::jump_to(std::string name)
 {
     jump_stack_.push(ip_);
     ip_ = label_map_.at(name);
-    // std::advance(ip_, -1);
 }
 
 void Machine::_return()
 {
     ip_ = jump_stack_.top();
     jump_stack_.pop();
+}
+
+void Machine::set_comparison_status_flag(CmpStatusFlags new_status)
+{
+    if (new_status == CmpStatusFlags::Invalid)
+    {
+        comparison_status_register_ = CmpStatusFlags::Invalid;
+    }
+    else
+    {
+        comparison_status_register_ = static_cast<CmpStatusFlags>(comparison_status_register_ | new_status);
+    }
+}
+void Machine::jump_if_flag_is_set(std::string label, CmpStatusFlags flag)
+{
+    if (comparison_status_register_ & flag)
+    {
+        jump_to(label);
+    }
 }
 
 // static int& getReg(Registers& regs, std::string name)
