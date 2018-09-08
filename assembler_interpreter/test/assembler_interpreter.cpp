@@ -76,5 +76,40 @@ TEST(AssemblerInterpreter, LabelDefinition)
     std::string program{R"(
 Function:
 )"};
+    std::cout << "here";
     EXPECT_EQ(assembler_interpreter(program), "-1");
+}
+
+TEST(AssemblerInterpreter, CallInstruction)
+{
+    std::string program{R"( ; My first program
+mov  a, 5
+call Func
+msg 'Reg: ', a ; This  is a trailing comment
+end
+Func:
+    inc a
+    ret
+)"};
+    EXPECT_EQ(assembler_interpreter(program), "Reg: 6");
+}
+
+TEST(AssemblerInterpreter, NestedCalls)
+{
+    std::string program{R"( ; My first program
+mov  a, 5
+call Func
+msg 'Reg: ', a ; This  is a trailing comment
+end
+
+Func:
+    inc a
+    call OtherFunc
+    ret
+
+OtherFunc:
+    inc a
+    ret
+)"};
+    EXPECT_EQ(assembler_interpreter(program), "Reg: 7");
 }

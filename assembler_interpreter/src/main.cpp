@@ -7,6 +7,7 @@
 #include <memory>
 #include <regex>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -77,6 +78,8 @@ class Machine
     void end_execution();
     std::string flush();
     void add_label_reference(std::string name);
+    void jump_to(std::string name);
+    void _return();
 
   public:
     std::stringstream msg_port{};
@@ -93,6 +96,7 @@ class Machine
     ProgramPtr ip_{program_.begin()};
     Program program_{};
     InstructionFactory instruction_factory_{registers_};
+    std::stack<ProgramPtr> jump_stack_{};
 };
 
 class Instruction
@@ -280,20 +284,44 @@ void Msg::operate_on(Machine& machine)
                    });
 }
 
-class Label : public NullaryInstruction
+class Label : public UnaryInstruction
 {
   public:
-    using NullaryInstruction::NullaryInstruction;
+    using UnaryInstruction::UnaryInstruction;
     void pre_run(Machine& machine) override;
     void operate_on(Machine& machine) override;
 };
 
 void Label::pre_run(Machine& machine)
 {
-    machine.add_label_reference(name_);
+    machine.add_label_reference(register_);
 }
 
 void Label::operate_on(Machine& machine) {}
+
+class Call : public UnaryInstruction
+{
+  public:
+    using UnaryInstruction::UnaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void Call::operate_on(Machine& machine)
+{
+    machine.jump_to(register_);
+}
+
+class Ret : public NullaryInstruction
+{
+  public:
+    using NullaryInstruction::NullaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void Ret::operate_on(Machine& machine)
+{
+    machine._return();
+}
 
 void Mov::operate_on(Machine& machine)
 {
@@ -338,6 +366,8 @@ InstructionFactory::InstructionFactory(Registers& registers) : registers_{regist
     instruction_map_.emplace("end", [this](auto const& tokens) { return make_instruction<End>(tokens); });
     instruction_map_.emplace("msg", [this](auto const& tokens) { return make_instruction<Msg>(tokens); });
     instruction_map_.emplace("label", [this](auto const& tokens) { return make_instruction<Label>(tokens); });
+    instruction_map_.emplace("call", [this](auto const& tokens) { return make_instruction<Call>(tokens); });
+    instruction_map_.emplace("ret", [this](auto const& tokens) { return make_instruction<Ret>(tokens); });
 }
 
 Instruction_ptr InstructionFactory::create_instruction(std::string const& name,
@@ -349,7 +379,7 @@ Instruction_ptr InstructionFactory::create_instruction(std::string const& name,
     {
         std::vector<std::string> tmp_arguments{arguments.begin(), arguments.end()};
         tmp_arguments.push_back(name.substr(0, find_iter));
-        return instruction_map_.at("label")(arguments);
+        return instruction_map_.at("label")(tmp_arguments);
     }
     else
     {
@@ -391,24 +421,22 @@ void Machine::load_program(RawProgram const& prog)
         program_.push_back(
             instruction_factory_.create_instruction(tokens.front(), {std::next(tokens.begin(), 1), tokens.end()}));
     }
-    ip_ = program_.begin();
+    pre_run();
 }
 
 void Machine::pre_run()
 {
-    while (ip_ != program_.end())
+    for (ip_ = program_.begin();ip_ != program_.end(); std::advance(ip_, 1))
     {
         get_current_instruction().pre_run(*this);
-        std::advance(ip_, 1);
     }
 }
 
 void Machine::run_program()
 {
-    while (ip_ != program_.end())
+    for (ip_ = program_.begin();ip_ != program_.end(); std::advance(ip_, 1))
     {
         get_current_instruction().operate_on(*this);
-        std::advance(ip_, 1);
     }
 }
 
@@ -434,7 +462,21 @@ std::string Machine::flush()
 
 void Machine::add_label_reference(std::string name)
 {
+    std::cout << "Adding label " << std::quoted(name) << std::endl;
     label_map_[name] = ip_;
+}
+
+void Machine::jump_to(std::string name)
+{
+    jump_stack_.push(ip_);
+    ip_ = label_map_.at(name);
+    // std::advance(ip_, -1);
+}
+
+void Machine::_return()
+{
+    ip_ = jump_stack_.top();
+    jump_stack_.pop();
 }
 
 // static int& getReg(Registers& regs, std::string name)
