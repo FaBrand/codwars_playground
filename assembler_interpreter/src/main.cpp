@@ -71,6 +71,7 @@ class Machine
     int& get_register(std::string const&);
     Registers const& get_registers() const;
     void advance_ip(std::ptrdiff_t diff);
+    void end_execution();
 
   private:
     std::vector<std::string> split_tokens(std::string const& command);
@@ -94,6 +95,13 @@ class Instruction
   protected:
     std::string name_{};
     ValueResolver* value_resolver_{nullptr};
+};
+
+class NullaryInstruction : public Instruction
+{
+  public:
+    NullaryInstruction(std::vector<std::string> const& tokens) : Instruction() {}
+    ~NullaryInstruction() = default;
 };
 
 class UnaryInstruction : public Instruction
@@ -199,6 +207,18 @@ void Div::operate_on(Machine& machine)
     machine.get_register(register_) = machine.get_register(register_) / value_resolver_->get_value_of(value_);
 }
 
+class End : public NullaryInstruction
+{
+  public:
+    using NullaryInstruction::NullaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void End::operate_on(Machine& machine)
+{
+    machine.end_execution();
+}
+
 void Mov::operate_on(Machine& machine)
 {
     machine.get_register(register_) = value_resolver_->get_value_of(value_);
@@ -239,6 +259,7 @@ InstructionFactory::InstructionFactory(Registers& registers) : registers_{regist
     instruction_map_.emplace("sub", [this](auto const& tokens) { return make_instruction<Sub>(tokens); });
     instruction_map_.emplace("mul", [this](auto const& tokens) { return make_instruction<Mul>(tokens); });
     instruction_map_.emplace("div", [this](auto const& tokens) { return make_instruction<Div>(tokens); });
+    instruction_map_.emplace("end", [this](auto const& tokens) { return make_instruction<End>(tokens); });
 }
 
 Instruction_ptr InstructionFactory::create_instruction(std::string const& name,
@@ -268,12 +289,17 @@ void Machine::advance_ip(std::ptrdiff_t diff)
         std::advance(ip_, 1);
     }
 }
-
+void Machine::end_execution()
+{
+    ip_ = next(program_.end(), -1);
+}
 void Machine::load_program(RawProgram const& prog)
 {
     for (auto const& instruction : prog)
     {
         auto tokens{split_tokens(instruction)};
+        if (tokens.front().find(";") != std::string::npos)
+            continue;
         program_.push_back(
             instruction_factory_.create_instruction(tokens.front(), {std::next(tokens.begin(), 1), tokens.end()}));
     }
