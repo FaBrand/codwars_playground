@@ -151,6 +151,54 @@ class Jnz : public BinaryInstruction
     int calculate_jump_distance();
 };
 
+class Add : public BinaryInstruction
+{
+  public:
+    using BinaryInstruction::BinaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void Add::operate_on(Machine& machine)
+{
+    machine.get_register(register_) = machine.get_register(register_) + value_resolver_->get_value_of(value_);
+}
+
+class Sub : public BinaryInstruction
+{
+  public:
+    using BinaryInstruction::BinaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void Sub::operate_on(Machine& machine)
+{
+    machine.get_register(register_) = machine.get_register(register_) - value_resolver_->get_value_of(value_);
+}
+
+class Mul : public BinaryInstruction
+{
+  public:
+    using BinaryInstruction::BinaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void Mul::operate_on(Machine& machine)
+{
+    machine.get_register(register_) = machine.get_register(register_) * value_resolver_->get_value_of(value_);
+}
+
+class Div : public BinaryInstruction
+{
+  public:
+    using BinaryInstruction::BinaryInstruction;
+    void operate_on(Machine& machine) override;
+};
+
+void Div::operate_on(Machine& machine)
+{
+    machine.get_register(register_) = machine.get_register(register_) / value_resolver_->get_value_of(value_);
+}
+
 void Mov::operate_on(Machine& machine)
 {
     machine.get_register(register_) = value_resolver_->get_value_of(value_);
@@ -187,6 +235,10 @@ InstructionFactory::InstructionFactory(Registers& registers) : registers_{regist
     instruction_map_.emplace("jnz", [this](auto const& tokens) { return make_instruction<Jnz>(tokens); });
     instruction_map_.emplace("inc", [this](auto const& tokens) { return make_instruction<Inc>(tokens); });
     instruction_map_.emplace("dec", [this](auto const& tokens) { return make_instruction<Dec>(tokens); });
+    instruction_map_.emplace("add", [this](auto const& tokens) { return make_instruction<Add>(tokens); });
+    instruction_map_.emplace("sub", [this](auto const& tokens) { return make_instruction<Sub>(tokens); });
+    instruction_map_.emplace("mul", [this](auto const& tokens) { return make_instruction<Mul>(tokens); });
+    instruction_map_.emplace("div", [this](auto const& tokens) { return make_instruction<Div>(tokens); });
 }
 
 Instruction_ptr InstructionFactory::create_instruction(std::string const& name,

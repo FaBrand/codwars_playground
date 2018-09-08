@@ -88,3 +88,38 @@ TEST(SimpleAssembler_1, Complex3Fake)
                                      "mov c a"};
     assembler(program);
 }
+
+TEST(SimpleAssembler_1, SimpleAdd)
+{
+    std::vector<std::string> program{"mov a 5", "add a 1"};
+    std::unordered_map<std::string, int> out{{"a", 6}};
+    EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
+}
+
+TEST(SimpleAssembler_1, SimpleSub)
+{
+    std::vector<std::string> program{"mov a 5", "sub a 1"};
+    std::unordered_map<std::string, int> out{{"a", 4}};
+    EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
+}
+
+TEST(SimpleAssembler_1, SimpleMul)
+{
+    std::vector<std::string> program{"mov a 5", "mul a 2"};
+    std::unordered_map<std::string, int> out{{"a", 10}};
+    EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
+}
+
+TEST(SimpleAssembler_1, SimpleDiv)
+{
+    std::vector<std::string> program{"mov a 4", "div a 2"};
+    std::unordered_map<std::string, int> out{{"a", 2}};
+    EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
+}
+
+TEST(SimpleAssembler_1, SimpleDivFloor)
+{
+    std::vector<std::string> program{"mov a 5", "div a 2"};
+    std::unordered_map<std::string, int> out{{"a", 2}};
+    EXPECT_THAT(assembler(program), ::testing::ContainerEq(out));
+}
