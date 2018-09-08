@@ -70,3 +70,11 @@ msg 'Reg: ', a
 )"};
     EXPECT_EQ(assembler_interpreter(program), "-1");
 }
+
+TEST(AssemblerInterpreter, LabelDefinition)
+{
+    std::string program{R"(
+Function:
+)"};
+    EXPECT_EQ(assembler_interpreter(program), "-1");
+}

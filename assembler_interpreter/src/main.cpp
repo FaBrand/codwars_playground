@@ -76,16 +76,20 @@ class Machine
     void advance_ip(std::ptrdiff_t diff);
     void end_execution();
     std::string flush();
+    void add_label_reference(std::string name);
 
   public:
     std::stringstream msg_port{};
 
   private:
+    void pre_run();
+
     std::stringstream default_out{"-1"};
     std::stringstream* std_out{&default_out};
     std::vector<std::string> split_tokens(std::string const& command);
     Instruction& get_current_instruction() const;
     Registers registers_{};
+    std::unordered_map<std::string, ProgramPtr> label_map_{};
     ProgramPtr ip_{program_.begin()};
     Program program_{};
     InstructionFactory instruction_factory_{registers_};
@@ -99,6 +103,7 @@ class Instruction
     {
         value_resolver_ = resolver;
     }
+    virtual void pre_run(Machine& machine) {}
     virtual void operate_on(Machine& machine) = 0;
 
   protected:
@@ -275,6 +280,21 @@ void Msg::operate_on(Machine& machine)
                    });
 }
 
+class Label : public NullaryInstruction
+{
+  public:
+    using NullaryInstruction::NullaryInstruction;
+    void pre_run(Machine& machine) override;
+    void operate_on(Machine& machine) override;
+};
+
+void Label::pre_run(Machine& machine)
+{
+    machine.add_label_reference(name_);
+}
+
+void Label::operate_on(Machine& machine) {}
+
 void Mov::operate_on(Machine& machine)
 {
     machine.get_register(register_) = value_resolver_->get_value_of(value_);
@@ -317,12 +337,24 @@ InstructionFactory::InstructionFactory(Registers& registers) : registers_{regist
     instruction_map_.emplace("div", [this](auto const& tokens) { return make_instruction<Div>(tokens); });
     instruction_map_.emplace("end", [this](auto const& tokens) { return make_instruction<End>(tokens); });
     instruction_map_.emplace("msg", [this](auto const& tokens) { return make_instruction<Msg>(tokens); });
+    instruction_map_.emplace("label", [this](auto const& tokens) { return make_instruction<Label>(tokens); });
 }
 
 Instruction_ptr InstructionFactory::create_instruction(std::string const& name,
                                                        std::vector<std::string> const& arguments)
 {
-    return instruction_map_.at(name)(arguments);
+    const auto find_iter{name.find(":")};
+    const auto is_label{find_iter != std::string::npos};
+    if (is_label)
+    {
+        std::vector<std::string> tmp_arguments{arguments.begin(), arguments.end()};
+        tmp_arguments.push_back(name.substr(0, find_iter));
+        return instruction_map_.at("label")(arguments);
+    }
+    else
+    {
+        return instruction_map_.at(name)(arguments);
+    }
 }
 
 Instruction& Machine::get_current_instruction() const
@@ -362,6 +394,15 @@ void Machine::load_program(RawProgram const& prog)
     ip_ = program_.begin();
 }
 
+void Machine::pre_run()
+{
+    while (ip_ != program_.end())
+    {
+        get_current_instruction().pre_run(*this);
+        std::advance(ip_, 1);
+    }
+}
+
 void Machine::run_program()
 {
     while (ip_ != program_.end())
@@ -389,6 +430,11 @@ Registers const& Machine::get_registers() const
 std::string Machine::flush()
 {
     return std_out->str();
+}
+
+void Machine::add_label_reference(std::string name)
+{
+    label_map_[name] = ip_;
 }
 
 // static int& getReg(Registers& regs, std::string name)
